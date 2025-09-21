@@ -21,7 +21,8 @@
         .ui-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 2000; transition: opacity 0.5s ease, visibility 0.5s ease; background: linear-gradient(135deg, var(--color-darker), var(--color-dark)); }
         .ui-screen.hidden { opacity: 0; visibility: hidden; }
         .ui-modal { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 40px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 0 40px rgba(255, 140, 0, 0.1); text-align: center; max-width: 800px; width: 90%; }
-        .game-title { font-family: 'Orbitron', sans-serif; font-size: clamp(1.8rem, 5vw, 3rem); margin-bottom: 16px; background: linear-gradient(45deg, var(--color-gold), var(--color-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
+        .game-title { font-family: 'Orbitron', sans-serif; font-size: clamp(1.8rem, 5vw, 3rem); margin-bottom: 16px; background: linear-gradient(45deg, var(--color-gold), var(--color-primary)); 
+        background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
         .game-subtitle { font-size: clamp(1rem, 3vw, 1.5rem); margin-bottom: 32px; color: var(--color-text-secondary); }
         .loading-bar { width: 300px; height: 4px; background: rgba(0, 0, 0, 0.3); border-radius: 4px; margin: 24px auto; overflow: hidden; }
         .loading-progress { width: 0%; height: 100%; background: linear-gradient(90deg, var(--color-primary), var(--color-gold)); transition: width 0.3s ease; }
