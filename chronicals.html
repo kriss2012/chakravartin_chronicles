@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Chakravartin Chronicles</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Rajdhani:wght@400;600&family=Noto+Sans+Devanagari&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --color-primary: #ff8c00; --color-secondary: #00f2fe; --color-accent: #4affd1; --color-dark: #0a0f1f; --color-darker: #050810; --color-surface: rgba(15, 23, 42, 0.9); --color-border: rgba(255, 140, 0, 0.25); --color-text: #e2e8f0; --color-text-secondary: #94a3b8; --color-success: #39ff14; --color-danger: #ff4466; --color-gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body { font-family: 'Rajdhani', sans-serif; background: var(--color-darker); color: var(--color-text); overflow: hidden; min-height: 100vh; }
+        .sanskrit { font-family: 'Noto Sans Devanagari', sans-serif; color: var(--color-gold); }
+
+        .ui-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 2000; transition: opacity 0.5s ease, visibility 0.5s ease; background: linear-gradient(135deg, var(--color-darker), var(--color-dark)); }
+        .ui-screen.hidden { opacity: 0; visibility: hidden; }
+        .ui-modal { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 40px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 0 40px rgba(255, 140, 0, 0.1); text-align: center; max-width: 800px; width: 90%; }
+        .game-title { font-family: 'Orbitron', sans-serif; font-size: clamp(1.8rem, 5vw, 3rem); margin-bottom: 16px; background: linear-gradient(45deg, var(--color-gold), var(--color-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
+        .game-subtitle { font-size: clamp(1rem, 3vw, 1.5rem); margin-bottom: 32px; color: var(--color-text-secondary); }
+        .loading-bar { width: 300px; height: 4px; background: rgba(0, 0, 0, 0.3); border-radius: 4px; margin: 24px auto; overflow: hidden; }
+        .loading-progress { width: 0%; height: 100%; background: linear-gradient(90deg, var(--color-primary), var(--color-gold)); transition: width 0.3s ease; }
+        .backstory-text { font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px; opacity: 0; transform: translateY(20px); transition: opacity 0.8s ease, transform 0.8s ease; }
+        .backstory-text.visible { opacity: 1; transform: translateY(0); }
+        .backstory-skip { position: absolute; top: 20px; right: 20px; background: none; border: 1px solid var(--color-border); color: var(--color-text-secondary); padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: all 0.3s ease; }
+        .backstory-skip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+        .menu-buttons { display: flex; flex-direction: column; gap: 16px; min-width: 250px; }
+        .menu-button { padding: 16px 32px; background: transparent; color: var(--color-text); border: 1px solid var(--color-border); border-radius: 8px; font-size: 1.1rem; font-family: 'Rajdhani', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .menu-button:hover { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-darker); transform: translateY(-3px) scale(1.05); box-shadow: 0 0 20px rgba(255, 140, 0, 0.3); }
+        .game-interface { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: none; }
+        .game-interface.active { display: block; }
+        #game-container { width: 100%; height: 100%; position: relative; }
+        .game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
+        .game-hud > * { pointer-events: auto; }
+        .hud-element { position: absolute; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 12px 16px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); transition: opacity 0.5s, transform 0.5s; }
+        .chapter-info-hud { top: 20px; left: 20px; }
+        .chapter-info-hud h3 { font-size: 1.2rem; margin-bottom: 8px; color: var(--color-accent); font-family: 'Orbitron'; }
+        .dialogue-box { bottom: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 800px; opacity: 0; visibility: hidden; }
+        .dialogue-box.active { opacity: 1; visibility: visible; animation: dialogueFadeIn 0.5s ease; }
+        .character-name { font-size: 1.2rem; font-weight: 600; color: var(--color-accent); margin-bottom: 12px; }
+        .dialogue-text { font-size: 1.1rem; line-height: 1.6; margin-bottom: 16px; min-height: 60px; }
+        .dialogue-continue { text-align: right; font-size: 0.8rem; color: var(--color-text-secondary); animation: pulse 2s infinite; }
+        .emotion-determined { border-left: 3px solid var(--color-secondary); } .emotion-menacing { border-left: 3px solid var(--color-danger); } .emotion-wise { border-left: 3px solid var(--color-gold); } .emotion-mystical { border-left: 3px solid var(--color-primary); }
+        .puzzle-container { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 800px; opacity: 0; visibility: hidden; }
+        .puzzle-container.active { opacity: 1; visibility: visible; animation: fadeIn 0.5s ease; }
+        .puzzle-title { font-size: 1.5rem; color: var(--color-accent); margin-bottom: 15px; text-align: center; font-family: 'Orbitron'; }
+        .puzzle-description { margin-bottom: 25px; text-align: center; }
+        .puzzle-content { display: none; } .puzzle-content.active { display: block; }
+        .puzzle-actions { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .puzzle-grid { display: grid; gap: 10px; margin: 20px auto; justify-content: center; max-width: 600px; }
+        .puzzle-item { padding: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; transition: all 0.3s ease; text-align: center; font-size: 1.2rem; }
+        .puzzle-item:hover { border-color: var(--color-primary); background: rgba(255, 140, 0, 0.1); }
+        .puzzle-item.selected { border-color: var(--color-accent); background: rgba(74, 255, 209, 0.2); }
+        
+        /* Logic Grid Puzzle */
+        #logic-grid-container { display: flex; gap: 20px; justify-content: center; }
+        .logic-grid-clues { flex-basis: 300px; text-align: left; font-size: 0.9rem; line-height: 1.5; } .logic-grid-clues ul { list-style-position: inside; padding-left: 10px; }
+        .logic-grid table { border-collapse: collapse; } .logic-grid th, .logic-grid td { border: 1px solid var(--color-border); padding: 8px; text-align: center; min-width: 100px; }
+        .logic-grid select { background: var(--color-dark); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 4px; padding: 5px; width: 100%; }
+        
+        /* Constellation Puzzle */
+        #constellation-canvas { background: #000010; border: 1px solid var(--color-border); border-radius: 8px; cursor: crosshair; margin: 0 auto; display: block; }
+
+        /* Tidal Flow Puzzle */
+        #tidal-flow-grid { display: grid; margin: 20px auto; border: 2px solid var(--color-primary); background: #001f3f; padding: 5px; }
+        .pipe { background-size: cover; cursor: pointer; } .pipe-start { background-image: url('https://i.imgur.com/7o3S0Yd.png'); } .pipe-end { background-image: url('https://i.imgur.com/AKf9J2m.png'); }
+        
+        /* Rhythm Dance Puzzle */
+        #dance-sequence { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; min-height: 60px; border: 1px dashed var(--color-border); padding: 10px; border-radius: 8px; }
+        .dance-pose { font-size: 2.5rem; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; }
+        #dance-player-input { display: flex; justify-content: center; gap: 10px; }
+
+        .hidden { display: none !important; }
+        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -45%) scale(0.98); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+        @keyframes dialogueFadeIn { from { opacity: 0; transform: translate(-50%, 20px) scale(0.98); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .puzzle-container.incorrect { animation: shake 0.5s; }
+        @keyframes shake { 0%, 100% { transform: translate(-50%, -50%); } 25% { transform: translate(-52%, -50%); } 75% { transform: translate(-48%, -50%); } }
+    </style>
+</head>
+<body>
+    <div id="loading-screen" class="ui-screen"><div class="ui-modal"><h1 class="game-title">The Chakravartin Chronicles</h1><div class="loading-bar"><div class="loading-progress"></div></div><p>Awakening Dharma...</p></div></div>
+    <div id="backstory-screen" class="ui-screen hidden"><button class="backstory-skip">Skip</button><div class="ui-modal" style="text-align: left;"><h2 style="text-align: center;">The Legacy</h2><div id="backstory-text-container"></div></div></div>
+    <div id="main-menu" class="ui-screen hidden"><div class="ui-modal"><h1 class="game-title">The Chakravartin Chronicles</h1><p class="game-subtitle">An Epic Indian Mythology Adventure</p><div class="menu-buttons"><button class="menu-button" id="new-game-btn">Begin Journey</button></div></div></div>
+
+    <div id="game-interface" class="game-interface">
+        <div id="game-container"></div>
+        <div class="game-hud">
+            <div class="hud-element chapter-info-hud"><h3 id="chapter-title"></h3><p id="chapter-location"></p></div>
+            <div id="dialogue-box" class="hud-element dialogue-box"><div id="character-name"></div><div id="dialogue-text"></div><div class="dialogue-continue"><p>Press SPACE to continue</p></div></div>
+            <div id="puzzle-container" class="hud-element puzzle-container">
+                <h2 class="puzzle-title"></h2><p class="puzzle-description"></p>
+                <!-- Puzzle Content Areas -->
+                <div id="logic-grid-puzzle" class="puzzle-content"><div id="logic-grid-container"><div class="logic-grid-clues"><h4>Clues:</h4><ul id="logic-grid-clues-list"></ul></div><div class="logic-grid"><table id="logic-grid-table"></table></div></div></div>
+                <div id="constellation-puzzle" class="puzzle-content"><canvas id="constellation-canvas" width="500" height="400"></canvas></div>
+                <div id="tidal-flow-puzzle" class="puzzle-content"><div id="tidal-flow-grid"></div></div>
+                <div id="rhythm-dance-puzzle" class="puzzle-content"><div><h4>Observe the Sequence:</h4><div id="dance-sequence"></div><h4>Your Turn:</h4><div id="dance-player-input"></div></div></div>
+                <div id="choice-puzzle" class="puzzle-content"><div class="puzzle-grid" id="choice-grid"></div></div>
+                <!-- Puzzle Actions -->
+                <div class="puzzle-actions"><button class="menu-button" id="check-puzzle-btn">Check</button><button class="menu-button" id="reset-puzzle-btn">Reset</button></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// Main Game Class
+class ChakravartinGame {
+    constructor() {
+        this.gameState = 'loading';
+        this.puzzleSystem = new PuzzleSystem(this);
+        this.chapterData = this.initChapterData();
+        this.currentChapter = 1; this.currentScene = 1; this.currentDialogues = []; this.currentDialogueIndex = 0;
+        this.init();
+    }
+    init() {
+        this.setupEventListeners();
+        document.querySelector('.loading-progress').style.width = '100%';
+        setTimeout(() => {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('backstory-screen').classList.remove('hidden');
+            this.setState('backstory'); this.playBackstory();
+        }, 1500);
+    }
+    setState(newState) { this.gameState = newState; console.log("Game state:", newState); }
+    playBackstory() {
+        const texts = ["Tejas Shrivastava, tech mogul and secret archaeologist, lives between two worlds: modern corporate India and its ancient, mystical past.", "His life changes upon discovering his late grandfather's research—an encrypted manuscript of the Chakravartin Seal, a divine artifact that controls cosmic balance.", "As supernatural phenomena plague India's sacred sites, Tejas realizes the Seal's fragments are awakening.", "Dark forces, led by his ruthless rival Arjun Malhotra, are also hunting the Seal, seeking to control its immense power.", "Tejas must now embrace his grandfather's legacy, using modern skills to protect an ancient heritage. His journey begins now."];
+        let idx = 0; const container = document.getElementById('backstory-text-container'); container.innerHTML = '';
+        const showNext = () => {
+            if (this.gameState !== 'backstory' || idx >= texts.length) { setTimeout(() => this.showMainMenu(), 2500); return; }
+            const el = document.createElement('p'); el.className = 'backstory-text'; el.textContent = texts[idx++]; container.appendChild(el);
+            setTimeout(() => el.classList.add('visible'), 100); setTimeout(showNext, 3000);
+        };
+        showNext();
+    }
+    showMainMenu() {
+        if (this.gameState === 'menu') return;
+        document.getElementById('backstory-screen').classList.add('hidden');
+        document.getElementById('game-interface').classList.remove('active');
+        document.getElementById('main-menu').classList.remove('hidden');
+        this.setState('menu');
+        if (this.renderer) { this.renderer.domElement.remove(); this.renderer.dispose(); this.renderer = null; }
+    }
+    startNewGame() { this.startChapter(1); }
+    startChapter(num) {
+        this.currentChapter = num; this.currentScene = 1;
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('game-interface').classList.add('active');
+        const chapter = this.chapterData[num];
+        document.getElementById('chapter-title').textContent = `Phase ${num}: ${chapter.title}`;
+        document.getElementById('chapter-location').textContent = chapter.location;
+        this.initThreeJS(); this.startScene(num, 1);
+    }
+    startScene(chap, scene) {
+        this.currentScene = scene; const sceneData = this.chapterData[chap]?.scenes[scene];
+        if (!sceneData) { this.completeChapter(chap); return; }
+        this.currentDialogues = sceneData.dialogues || []; this.currentDialogueIndex = 0;
+        if (this.currentDialogues.length > 0) this.showDialogue(this.currentDialogues[0]);
+        else this.handleSceneEnd();
+    }
+    handleSceneEnd() {
+        document.getElementById('dialogue-box').classList.remove('active');
+        const sceneData = this.chapterData[this.currentChapter].scenes[this.currentScene];
+        if (sceneData.puzzle) this.showPuzzle(sceneData.puzzle);
+        else this.startScene(this.currentChapter, this.currentScene + 1);
+    }
+    showDialogue(dialogue) {
+        const box = document.getElementById('dialogue-box');
+        box.className = 'hud-element dialogue-box'; if (dialogue.emotion) box.classList.add(`emotion-${dialogue.emotion}`);
+        document.getElementById('character-name').textContent = dialogue.c;
+        document.getElementById('dialogue-text').innerHTML = dialogue.t.replace(/<sanskrit>(.*?)<\/sanskrit>/g, '<span class="sanskrit">$1</span>');
+        box.classList.add('active'); this.setState('dialogue');
+    }
+    nextDialogue() {
+        if (this.gameState !== 'dialogue') return;
+        this.currentDialogueIndex++;
+        if (this.currentDialogueIndex < this.currentDialogues.length) this.showDialogue(this.currentDialogues[this.currentDialogueIndex]);
+        else this.handleSceneEnd();
+    }
+    showPuzzle(puzzleData) { this.setState('puzzle'); this.puzzleSystem.generatePuzzle(puzzleData); document.getElementById('puzzle-container').classList.add('active'); }
+    closePuzzle() { document.getElementById('puzzle-container').classList.remove('active'); this.setState('playing'); }
+    completeChapter(chap) {
+        alert(`Phase ${chap} complete!`);
+        const nextChapter = chap + 1;
+        if (this.chapterData[nextChapter]) this.startChapter(nextChapter);
+        else { alert("Congratulations! You've finished The Chakravartin Chronicles!"); this.showMainMenu(); }
+    }
+    initThreeJS() {
+        const container = document.getElementById('game-container');
+        if (!container || this.renderer) return;
+        const styles = getComputedStyle(document.documentElement);
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(styles.getPropertyValue('--color-darker').trim());
+        this.scene.fog = new THREE.Fog(styles.getPropertyValue('--color-darker').trim(), 10, 30);
+        this.camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        this.camera.position.set(0, 3, 8);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(container.clientWidth, container.clientHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(this.renderer.domElement);
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI / 2.1;
+        this.createChapterEnvironment(); this.animate();
+    }
+    animate() { if (!this.renderer) return; requestAnimationFrame(() => this.animate()); this.controls.update(); this.renderer.render(this.scene, this.camera); }
+    setupEventListeners() {
+        document.querySelector('.backstory-skip').addEventListener('click', () => this.showMainMenu());
+        document.getElementById('new-game-btn').addEventListener('click', () => this.startNewGame());
+        document.getElementById('check-puzzle-btn').addEventListener('click', () => this.puzzleSystem.checkSolution());
+        document.getElementById('reset-puzzle-btn').addEventListener('click', () => this.puzzleSystem.resetPuzzle());
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space') this.nextDialogue(); });
+        window.addEventListener('resize', () => {
+            if (!this.renderer) return;
+            const container = document.getElementById('game-container');
+            this.camera.aspect = container.clientWidth / container.clientHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    }
+    initChapterData() {
+        return {
+            1: { title: "The Awakening", location: "Mumbai - Penthouse Office", scenes: {
+                1: { dialogues: [{c:"Tejas", t:"Strange energy readings at Hampi... just like grandfather's notes predicted.", emotion: "determined"}]},
+                2: { dialogues: [{c:"Grandfather (V.O.)", t:"Beta, some knowledge is too powerful for one lifetime. The Chakravartin Seal... it chooses its guardian.", emotion: "wise"}]},
+                3: { puzzle: { type: "decryption", title: "Digital Archaeology", desc: "Combine ancient Sanskrit with modern cryptography to decrypt the notes."}},
+                4: { dialogues: [{c:"Tejas", t:"Arjun Malhotra! He's after the seal too. I need to know his plan."}]},
+                5: { puzzle: { type: "logic_grid", title: "Corporate Espionage", desc: "Deduce the correct server, password, and time to access Arjun's files."}},
+                6: { dialogues: [{c:"Tejas", t:"I'm in. Satellite data... The energy anomalies are everywhere, but Hampi is the source. I have to go."}]}
+            }},
+            2: { title: "The Monkey King's Domain", location: "Hampi - Vijayanagara Ruins", scenes: {
+                1: { dialogues: [{c:"Tejas", t:"The archaeologists vanished. Locals speak of 'Hanuman's awakening'."}]},
+                2: { dialogues: [{c:"Ancient Priest (Vision)", t:"When dharma weakens, the worthy shall find the path through Hanuman's trials.", emotion: "mystical"}]},
+                3: { puzzle: { type: "constellation", title: "The Boulder Maze", desc: "Navigate the boulders by tracing Hanuman's Gada (mace) in the stars."}},
+                4: { dialogues: [{c:"Tejas", t:"An underground temple... 'मारुतिर्जयतेऽरीन्' (Maruti conquers enemies). A trial of strength and spirit."}]},
+                5: { dialogues: [{c:"Arjun's Mercenary", t:"End of the line, Shrivastava. Mr. Malhotra wants what you've found.", emotion:"menacing"},{c:"Tejas", t:"You're desecrating this sacred place! I won't let you."}]}
+            }},
+            3: { title: "The Serpent King's Labyrinth", location: "Mahabalipuram - Shore Temple", scenes: {
+                1: { dialogues: [{c:"Tejas", t:"The second fragment is in Patala Loka, an underwater chamber. I need to navigate the ancient tidal system."}]},
+                2: { dialogues: [{c:"King Narasimhavarman (Vision)", t:"Let the temple be beacon and guardian. When waters rise unnaturally, the serpent king shall test the worthy.", emotion: "wise"}]},
+                3: { puzzle: { type: "tidal_flow", title: "Tidal Mechanics", desc: "Align the ancient channels to safely divert the water and open the path."}},
+                4: { dialogues: [{c:"Arjun (comms)", t:"My submersible is a bit more advanced than your wits, Tejas. Give it up!", emotion:"menacing"}, {c:"Tejas", t:"It's not about the tech, Arjun. It's about respecting the flow."}]}
+            }},
+            4: { title: "The Cosmic Dancer's Stage", location: "Chidambaram - Nataraja Temple", scenes: {
+                1: { dialogues: [{c:"Tejas", t:"The third fragment is in the Akasha Linga. The laws of physics feel... different here."}]},
+                2: { dialogues: [{c:"Head Priest (Vision)", t:"In Shiva's dance lies the universe's rhythm. The seal vibrates with this cosmic frequency.", emotion: "mystical"}]},
+                3: { puzzle: { type: "rhythm_dance", title: "The Five Elements Trial", desc: "Replicate the cosmic dance of Nataraja by matching the sequence of poses."}},
+                4: { dialogues: [{c:"Arjun", t:"I have a divine right to this power! I am descended from kings!", emotion:"menacing"}, {c:"Tejas", t:"Worthiness isn't about birthright, Arjun. It's about wisdom."}]},
+                5: { dialogues: [{c:"Tejas", t:"The final fragment... Mount Kailash. The most dangerous journey of all."}]}
+            }},
+            5: { title: "The Destroyer's Summit", location: "Mount Kailash, Tibet", scenes: {
+                1: { dialogues: [{c:"Tejas", t:"I've crossed the border. The air is thin, and the mountain itself feels alive. This is Shiva's domain."}]},
+                2: { dialogues: [{c:"Cosmic Voice (Vision)", t:"When dharma weakens, the seal shall unite to restore balance. But beware... absolute power corrupts absolutely.", emotion: "mystical"}]},
+                3: { dialogues: [{c:"Monk", t:"To proceed, you must quiet the mind. Your material success has created much noise. Find your inner peace.", emotion:"wise"}]},
+                4: { dialogues: [{c:"Arjun", t:"ENOUGH GAMES! The seal is mine!", emotion:"menacing"}, {c:"Tejas", t:"I won't let you misuse its power at the roof of the world, Arjun!"}]},
+            }},
+            6: { title: "The Chakravartin's Choice", location: "Cosmic Nexus", scenes: {
+                 1: { dialogues: [{c:"The Seal (Voice)", t:"The cosmic order is in your hands. Your choice will define the next age.", emotion:"mystical"}]},
+                 2: { puzzle: { type: "choice", title: "The Final Choice", desc: "The completed seal tests you. Decide its fate.", choices: ["Become the Guardian", "Destroy the Seal", "Become the Unifier", "Become the Corruptor"]}},
+                 3: { dialogues: [{c:"Tejas", t:"It is done. A new era begins."}]}
+            }}
+        };
+    }
+    createChapterEnvironment() {
+        while (this.scene.children.length > 0) { this.scene.remove(this.scene.children[0]); }
+        const styles = getComputedStyle(document.documentElement);
+        const pColor = new THREE.Color(styles.getPropertyValue('--color-primary').trim());
+        const sColor = new THREE.Color(styles.getPropertyValue('--color-secondary').trim());
+        this.scene.add(new THREE.AmbientLight(0x404080, 0.8));
+        const keyLight = new THREE.DirectionalLight(pColor, 1.2);
+        keyLight.position.set(-5, 5, 5); this.scene.add(keyLight);
+        this.scene.add(new THREE.DirectionalLight(sColor, 1.0));
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshLambertMaterial({ color: 0x1a1c30 }));
+        ground.rotation.x = -Math.PI / 2; this.scene.add(ground);
+        const geo = new THREE.BoxGeometry(1, 1, 1);
+        let mat;
+        switch (this.currentChapter) {
+            case 1: mat = new THREE.MeshStandardMaterial({ color: sColor, emissive: sColor, emissiveIntensity: 0.2 }); break;
+            case 2: mat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 }); break;
+            case 3: mat = new THREE.MeshStandardMaterial({ color: 0x00BFFF, transparent: true, opacity: 0.7 }); break;
+            case 4: mat = new THREE.MeshStandardMaterial({ color: 0x4B0082, emissive: 0x4B0082, emissiveIntensity: 0.3 }); break;
+            case 5: mat = new THREE.MeshStandardMaterial({ color: 0xFFFAFA, roughness: 0.6 }); break;
+            case 6: mat = new THREE.MeshStandardMaterial({ color: 0xFFD700, emissive: 0xFFD700, emissiveIntensity: 0.5 }); break;
+            default: mat = new THREE.MeshStandardMaterial({ color: pColor });
+        }
+        for (let i = 0; i < 20; i++) {
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.scale.set(Math.random() * 2 + 0.5, Math.random() * 5 + 1, Math.random() * 2 + 0.5);
+            mesh.position.set((Math.random() - 0.5) * 40, mesh.scale.y / 2, (Math.random() - 0.5) * 40);
+            this.scene.add(mesh);
+        }
+    }
+}
+
+// Puzzle System Class
+class PuzzleSystem {
+    constructor(game) { this.game = game; }
+    generatePuzzle(data) {
+        this.currentPuzzle = data;
+        document.querySelector('#puzzle-container .puzzle-title').textContent = data.title;
+        document.querySelector('#puzzle-container .puzzle-description').innerHTML = data.desc.replace(/<sanskrit>(.*?)<\/sanskrit>/g, '<span class="sanskrit">$1</span>');
+        document.querySelectorAll('.puzzle-content').forEach(p => p.classList.remove('active'));
+        this.setupPuzzleByType(data);
+    }
+    setupPuzzleByType(data) {
+        let puzzleContent;
+        switch(data.type) {
+            case 'decryption': puzzleContent = this.setupDecryption(); break;
+            case 'logic_grid': puzzleContent = this.setupLogicGrid(); break;
+            case 'constellation': puzzleContent = this.setupConstellation(); break;
+            case 'tidal_flow': puzzleContent = this.setupTidalFlow(); break;
+            case 'rhythm_dance': puzzleContent = this.setupRhythmDance(); break;
+            case 'choice': puzzleContent = this.setupChoice(data.choices); break;
+        }
+        if (puzzleContent) puzzleContent.classList.add('active');
+    }
+    
+    // Decryption (Placeholder for more complex logic if needed)
+    setupDecryption() {
+        this.currentPuzzle.type = 'choice'; // Convert to simple choice for this implementation
+        return this.setupChoice(['Combine Sanskrit & Crypto', 'Brute-force the server', 'Analyze satellite data']);
+    }
+
+    // Logic Grid Puzzle
+    setupLogicGrid() {
+        const container = document.getElementById('logic-grid-puzzle');
+        const clues = ["1. The Research server is not password protected by 'Dharma'.", "2. The 'Varuna' server is accessed after midnight.", "3. The password 'Cosmos' is not used for the Finance server.", "4. The hack on the 'Indra' server happens at exactly 22:00."];
+        document.getElementById('logic-grid-clues-list').innerHTML = clues.map(c => `<li>${c}</li>`).join('');
+        const table = document.getElementById('logic-grid-table');
+        const servers = ['Indra', 'Varuna', 'Agni'];
+        const passwords = ['Dharma', 'Cosmos', 'Rta'];
+        const times = ['22:00', '01:00', '04:00'];
+        let html = `<thead><tr><th>Server</th><th>Password</th><th>Time</th></tr></thead><tbody>`;
+        servers.forEach(server => {
+            html += `<tr><td>${server}</td>
+            <td><select id="pass-${server}">${passwords.map(p => `<option>${p}</option>`).join('')}</select></td>
+            <td><select id="time-${server}">${times.map(t => `<option>${t}</option>`).join('')}</select></td></tr>`;
+        });
+        table.innerHTML = html + `</tbody>`;
+        return container;
+    }
+    
+    // Constellation Puzzle
+    setupConstellation() {
+        const container = document.getElementById('constellation-puzzle');
+        const canvas = document.getElementById('constellation-canvas');
+        this.constellationCtx = canvas.getContext('2d');
+        this.stars = [{x:50,y:50},{x:150,y:350},{x:200,y:200},{x:300,y:100},{x:400,y:150},{x:450,y:300}];
+        this.connectedStars = [];
+        this.drawConstellation();
+        canvas.onclick = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left, y = e.clientY - rect.top;
+            const clickedStar = this.stars.find(s => Math.hypot(s.x - x, s.y - y) < 10);
+            if (clickedStar) {
+                const index = this.stars.indexOf(clickedStar);
+                if (!this.connectedStars.includes(index)) this.connectedStars.push(index);
+                this.drawConstellation();
+            }
+        };
+        return container;
+    }
+    drawConstellation() {
+        this.constellationCtx.clearRect(0, 0, 500, 400);
+        this.constellationCtx.fillStyle = '#fff';
+        this.stars.forEach(s => { this.constellationCtx.beginPath(); this.constellationCtx.arc(s.x, s.y, 5, 0, 2*Math.PI); this.constellationCtx.fill(); });
+        if (this.connectedStars.length > 1) {
+            this.constellationCtx.strokeStyle = 'rgba(255, 215, 0, 0.7)'; this.constellationCtx.lineWidth = 2;
+            this.constellationCtx.beginPath(); this.constellationCtx.moveTo(this.stars[this.connectedStars[0]].x, this.stars[this.connectedStars[0]].y);
+            for (let i = 1; i < this.connectedStars.length; i++) this.constellationCtx.lineTo(this.stars[this.connectedStars[i]].x, this.stars[this.connectedStars[i]].y);
+            this.constellationCtx.stroke();
+        }
+    }
+
+    // Tidal Flow Puzzle
+    setupTidalFlow() {
+        const container = document.getElementById('tidal-flow-puzzle');
+        const grid = document.getElementById('tidal-flow-grid');
+        const size=5; grid.innerHTML = '';
+        this.pipeMap = [ [2,6,5,5,1], [0,3,6,5,1], [0,0,3,6,1], [0,0,0,3,1], [4,5,5,5,9] ];
+        this.pipeRotations = Array(size*size).fill(0);
+        grid.style.gridTemplateColumns = `repeat(${size}, 50px)`;
+        grid.style.gridTemplateRows = `repeat(${size}, 50px)`;
+        for(let i=0; i<size*size; i++) {
+            const pipe = document.createElement('div');
+            pipe.className = 'pipe'; pipe.dataset.index = i;
+            pipe.style.backgroundImage = `url('https://i.imgur.com/${this.getPipeImage(this.pipeMap.flat()[i])}')`;
+            pipe.onclick = () => this.rotatePipe(pipe, i);
+            grid.appendChild(pipe);
+        }
+        return container;
+    }
+    getPipeImage(type) {
+        return {0:'', 1:'sLP0j5y.png', 2:'7o3S0Yd.png', 3:'sLP0j5y.png', 4:'AKf9J2m.png', 5:'BvXgUq6.png', 6:'sLP0j5y.png', 9:'AKf9J2m.png'}[type]; // Straight, Corner
+    }
+    rotatePipe(pipeEl, index) {
+        this.pipeRotations[index] = (this.pipeRotations[index] + 90) % 360;
+        pipeEl.style.transform = `rotate(${this.pipeRotations[index]}deg)`;
+    }
+
+    // Rhythm Dance Puzzle
+    setupRhythmDance() {
+        const container = document.getElementById('rhythm-dance-puzzle');
+        this.danceSolution = [' सृष्टि', ' स्थिति', ' संहार', ' अनुग्रह'];
+        const symbols = {' सृष्टि': '🕉️', ' स्थिति': '❤️', ' संहार': '🔥', ' अनुग्रह': '🙏'};
+        const sequenceContainer = document.getElementById('dance-sequence');
+        const playerInputContainer = document.getElementById('dance-player-input');
+        sequenceContainer.innerHTML = ''; playerInputContainer.innerHTML = '';
+        this.playerDanceSequence = [];
+        this.danceSolution.forEach(pose => {
+            const el = document.createElement('div'); el.className = 'dance-pose'; el.textContent = symbols[pose];
+            sequenceContainer.appendChild(el);
+        });
+        Object.keys(symbols).forEach(poseName => {
+            const btn = document.createElement('button'); btn.className = 'puzzle-item'; btn.textContent = symbols[poseName];
+            btn.onclick = () => {
+                this.playerDanceSequence.push(poseName);
+                btn.classList.add('selected'); setTimeout(()=>btn.classList.remove('selected'), 500);
+            };
+            playerInputContainer.appendChild(btn);
+        });
+        setTimeout(() => sequenceContainer.innerHTML = '?', 4000); // Memory test
+        return container;
+    }
+
+    // Choice Puzzle
+    setupChoice(choices) {
+        const container = document.getElementById('choice-puzzle');
+        const grid = document.getElementById('choice-grid');
+        grid.innerHTML = ''; grid.style.gridTemplateColumns = '1fr';
+        choices.forEach(itemText => {
+            const el = document.createElement('div'); el.className = 'puzzle-item'; el.textContent = itemText;
+            el.onclick = () => { this.selectedChoice = itemText; document.querySelectorAll('#choice-grid .puzzle-item').forEach(i => i.classList.remove('selected')); el.classList.add('selected'); };
+            grid.appendChild(el);
+        });
+        return container;
+    }
+
+    checkSolution() {
+        let isCorrect = false;
+        switch (this.currentPuzzle.type) {
+            case 'logic_grid':
+                const s1p = document.getElementById('pass-Indra').value, s1t = document.getElementById('time-Indra').value;
+                const s2p = document.getElementById('pass-Varuna').value, s2t = document.getElementById('time-Varuna').value;
+                const s3p = document.getElementById('pass-Agni').value, s3t = document.getElementById('time-Agni').value;
+                isCorrect = s1p === 'Rta' && s1t === '22:00' && s2p === 'Cosmos' && s2t === '01:00' && s3p === 'Dharma' && s3t === '04:00';
+                break;
+            case 'constellation':
+                const solution = [0, 2, 3, 1, 5, 4];
+                isCorrect = this.connectedStars.length === solution.length && this.connectedStars.every((v,i) => v === solution[i]);
+                break;
+            case 'tidal_flow':
+                const correctRots = [0,270,0,0,0, 0,90,270,0,0, 0,0,90,270,0, 0,0,0,90,0, 0,0,0,0,0];
+                isCorrect = this.pipeRotations.every((r,i) => r === correctRots[i]);
+                break;
+            case 'rhythm_dance':
+                isCorrect = this.playerDanceSequence.length === this.danceSolution.length && this.playerDanceSequence.every((v,i)=>v===this.danceSolution[i]);
+                break;
+            case 'choice':
+                const solutions = { "Digital Archaeology": "Combine Sanskrit & Crypto", "The Final Choice": "Become the Guardian" };
+                isCorrect = solutions[this.currentPuzzle.title] === this.selectedChoice;
+                break;
+        }
+        const puzzleContainer = document.getElementById('puzzle-container');
+        if (isCorrect) {
+            puzzleContainer.classList.remove('incorrect');
+            this.game.closePuzzle();
+            this.game.startScene(this.game.currentChapter, this.game.currentScene + 1);
+        } else {
+            puzzleContainer.classList.add('incorrect');
+            setTimeout(() => puzzleContainer.classList.remove('incorrect'), 500);
+        }
+    }
+    resetPuzzle() {
+        document.getElementById('puzzle-container').classList.remove('incorrect');
+        this.generatePuzzle(this.currentPuzzle);
+    }
+}
+
+window.addEventListener('load', () => { new ChakravartinGame(); });
+</script>
+</body>
+</html>
+
