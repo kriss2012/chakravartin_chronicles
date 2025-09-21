@@ -335,7 +335,7 @@ class Game:
         self.draw_puzzle_base("Task 4.1: Cosmic Dance", game_script["PHASE_4"]["puzzle"]["prompt"], is_input_box=False)
         solution = game_script["PHASE_4"]["puzzle"]["solution"]
         
-        pulse_alpha = (math.sin(time.time() * 4) + 1) / 2 * 255
+        pulse_alpha = int((math.sin(time.time() * 4) + 1) / 2 * 255)
         pulse_color = (ORANGE[0], ORANGE[1], ORANGE[2], pulse_alpha)
         
         if time.time() > self.rhythm_pulse_time:
@@ -354,7 +354,10 @@ class Game:
                 color = RED
 
             if i == self.current_rhythm_step:
-                pygame.draw.circle(screen, pulse_color, pos, ui.get_font_size(50))
+                # Draw the pulse using a temporary surface to support alpha
+                pulse_surf = pygame.Surface((ui.get_font_size(100), ui.get_font_size(100)), pygame.SRCALPHA)
+                pygame.draw.circle(pulse_surf, pulse_color, (ui.get_font_size(50), ui.get_font_size(50)), ui.get_font_size(50))
+                screen.blit(pulse_surf, (pos[0] - ui.get_font_size(50), pos[1] - ui.get_font_size(50)))
 
             pygame.draw.circle(screen, color, pos, ui.get_font_size(40), 5)
             
